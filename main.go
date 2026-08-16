@@ -8,6 +8,8 @@
 //	chatrooms    query chatrooms from a keyed WeChat contact database (chatroom.go)
 //	messages     query messages across keyed WeChat message shards (message.go)
 //	sessions     query recent conversations from a keyed WeChat session database (session.go)
+//	sql          run a read-only SQL query against one database domain (sql.go, domain.go, preset.go)
+//	schema       list tables and columns of a database domain (schema.go)
 //	user         inspect and select users from the key store (user.go)
 //	license      print the license terms embedded in the executable (license.go)
 //	version      print the version embedded at build time (version.go)
@@ -45,6 +47,8 @@ subcommands:
   chatrooms    wcctl chatrooms [-user USER] [-json] [-keys PATH]
   messages     wcctl messages -chat USERNAME [-limit N] [-before TIME] [-user USER] [-json] [-keys PATH]
   sessions     wcctl sessions [-limit N] [-user USER] [-json] [-keys PATH]
+  sql          wcctl sql [-db DOMAIN] [-preset NAME] [-json] [-explain] "QUERY"
+  schema       wcctl schema [-db DOMAIN] [-chat USERNAME] [-json]
   user         wcctl user <ls|current|use|clear>
   license      wcctl license
   version      wcctl version`)
@@ -94,6 +98,10 @@ func main() {
 		cmdMessage(os.Args[2:])
 	case "sessions":
 		cmdSession(os.Args[2:])
+	case "sql":
+		cmdSQL(os.Args[2:])
+	case "schema":
+		cmdSchema(os.Args[2:])
 	case "user":
 		cmdUser(os.Args[2:])
 	case "license":

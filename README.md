@@ -177,6 +177,8 @@ wcctl contacts -json
 wcctl chatrooms -json
 wcctl sessions -limit 100 -json
 wcctl messages -chat wxid_example -limit 200 -json
+wcctl schema -db contact -json
+wcctl sql -db contact -json "SELECT username, remark FROM contact LIMIT 5"
 ```
 
 Any local tool that can run a command and parse JSON can use `wcctl`. A
@@ -186,6 +188,11 @@ typical workflow is:
 2. Select a session by its `username`.
 3. Run `messages -chat USERNAME -json` to retrieve the relevant history.
 4. Pass only that result to the agent or analysis step that needs it.
+
+When a question does not fit those commands — filtering by sender, counting,
+grouping — `sql` answers it in one call instead of retrieving whole
+conversations and filtering afterwards. Run `schema` first to see the available
+tables and columns.
 
 It also works in ordinary shell pipelines:
 
@@ -250,6 +257,65 @@ Text messages are decoded when possible. Image, video, voice, emoticon, and
 other attachment metadata may be shown, but exporting the media files
 themselves is not yet supported.
 
+### SQL
+
+```bash
+wcctl sql [-db DOMAIN] [-limit N] [-user USER] [-json] "QUERY"
+```
+
+Runs one read-only query when the listing commands above do not express the
+question. `-db` selects which database to read; it accepts the English name or
+the WeChat term:
+
+| `-db` | also accepts | contents |
+|-------|--------------|----------|
+| `messages` | `消息` | chat messages (`message_N.db`, sharded) |
+| `contact` | `通讯录` | contacts and chatrooms |
+| `session` | `会话` | the recent conversation list |
+| `sns` | `朋友圈` | Moments |
+| `fts` | `搜索` | the full-text index |
+| `favorite` | `收藏` | favorites |
+| `biz` | `公众号` | official account messages |
+
+```bash
+wcctl sql -db contact "SELECT username, remark FROM contact LIMIT 5"
+wcctl sql -db 朋友圈 -json "SELECT * FROM FeedsV20 LIMIT 5"
+wcctl sql -db messages - < query.sql
+```
+
+Only read-only statements run; writes are rejected. Results are capped
+(`-limit`, default 1000) and the cap is reported. `-explain` also reports the
+executed SQL, and `-dry-run` reports it without running it.
+
+The `messages` domain is spread over several database files. A query runs
+against each of them and the rows are concatenated, tagged with `_shard`. Each
+file sorts and limits its own rows, so `ORDER BY` and `LIMIT` do not apply
+across the combined result; the output says so. For ranked or aggregated
+questions that span conversations, query `-db fts`, which is a single database,
+or use a preset:
+
+```bash
+wcctl sql -list-presets
+wcctl sql -preset from-sender wxid_example -json
+```
+
+### Schema
+
+```bash
+wcctl schema [-db DOMAIN] [-chat USERNAME] [-user USER] [-json]
+```
+
+Lists the tables and columns of a domain, noting the details a query needs:
+which columns may be compressed, which identifiers are local to one database
+file, and how message types are encoded. Because each conversation is stored in
+a table named after a hash of its username, `-chat` resolves that name and
+reports which files hold it:
+
+```bash
+wcctl schema -db contact
+wcctl schema -chat wxid_example -json
+```
+
 ## Multiple accounts
 
 If keys have been acquired for more than one WeChat account, list them and
@@ -310,9 +376,12 @@ option list.
 
 - Use `wcctl` only with accounts and data you are authorized to access and
   only as permitted by the [license](LICENSE).
-- Contact, chatroom, session, and message queries do not modify WeChat's
-  database records. Multiple readers are supported.
-- `~/.wcctl/keys.json` contains sensitive database keys. Do not share it.
+wcctl contacts -json
+wcctl chatrooms -json
+wcctl sessions -limit 100 -json
+wcctl messages -chat wxid_example -limit 200 -json
+wcctl schema -db contact -json
+wcctl sql -db contact -json "SELECT username, remark FROM contact LIMIT 5"
 - A retained memory capture may contain messages, credentials, and other
   private data. Delete it when it is no longer needed.
 - JSON output can contain private contact and message data. Be deliberate about
